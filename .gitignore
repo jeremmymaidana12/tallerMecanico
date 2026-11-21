@@ -8,3 +8,6 @@
 # Build
 [Bb]in/
 [Oo]bj/
+
+# Conexion local de cada uno (no se sube)
+conexion.txt
