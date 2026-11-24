@@ -80,6 +80,45 @@ public static class Db
         return valor == DBNull.Value ? null : valor;
     }
 
+    /// <summary>Ejecuta todo o nada: si algo falla se deshacen los cambios.</summary>
+    public static T EnTransaccion<T>(Func<MySqlTransaction, T> accion)
+    {
+        using var conexion = AbrirConexion();
+        using var tx = conexion.BeginTransaction();
+        var resultado = accion(tx);
+        tx.Commit(); // sin Commit, el Dispose hace rollback
+        return resultado;
+    }
+
+    public static DataTable ConsultarTabla(MySqlTransaction tx, string sql, params MySqlParameter[] parametros)
+    {
+        using var comando = CrearComando(tx, sql, parametros);
+        using var lector = comando.ExecuteReader();
+        var tabla = new DataTable();
+        tabla.Load(lector);
+        return tabla;
+    }
+
+    public static int Ejecutar(MySqlTransaction tx, string sql, params MySqlParameter[] parametros)
+    {
+        using var comando = CrearComando(tx, sql, parametros);
+        return comando.ExecuteNonQuery();
+    }
+
+    public static long Insertar(MySqlTransaction tx, string sql, params MySqlParameter[] parametros)
+    {
+        using var comando = CrearComando(tx, sql, parametros);
+        comando.ExecuteNonQuery();
+        return comando.LastInsertedId;
+    }
+
+    public static object? Escalar(MySqlTransaction tx, string sql, params MySqlParameter[] parametros)
+    {
+        using var comando = CrearComando(tx, sql, parametros);
+        var valor = comando.ExecuteScalar();
+        return valor == DBNull.Value ? null : valor;
+    }
+
     public static bool ProbarConexion(out string error)
     {
         try
@@ -114,6 +153,13 @@ public static class Db
             };
         }
         return ex.Message;
+    }
+
+    private static MySqlCommand CrearComando(MySqlTransaction tx, string sql, MySqlParameter[] parametros)
+    {
+        var comando = CrearComando(tx.Connection!, sql, parametros);
+        comando.Transaction = tx;
+        return comando;
     }
 
     private static MySqlCommand CrearComando(MySqlConnection conexion, string sql, MySqlParameter[] parametros)
