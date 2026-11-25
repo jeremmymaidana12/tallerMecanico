@@ -59,7 +59,7 @@ public sealed class FrmPrincipal : Form
         AgregarModulo("📍   Sucursales", null);
 
         AgregarSeccion("VENTAS");
-        AgregarModulo("🧾   Ventas", null);
+        AgregarModulo("🧾   Ventas", () => new FrmVentas());
 
         Shown += (_, _) =>
         {
