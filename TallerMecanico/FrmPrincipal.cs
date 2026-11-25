@@ -59,6 +59,7 @@ public sealed class FrmPrincipal : Form
     private void RegistrarModulos()
     {
         AgregarSeccion("TALLER");
+        AgregarModulo(Iconos.Llave, "Órdenes de trabajo", () => new FrmOrdenesTrabajo());
         var vehiculos = AgregarModulo(Iconos.Auto, "Vehículos", () => new FrmVehiculos());
         AgregarModulo(Iconos.Clientes, "Clientes", () => new FrmClientes());
 
