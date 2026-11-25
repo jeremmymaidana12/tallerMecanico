@@ -321,7 +321,7 @@ public partial class FrmAbmBase : Form
 
     #region Flujo del ABM
 
-    private void IniciarAlta()
+    protected void IniciarAlta()
     {
         if (Modo != ModoAbm.Consulta) return;
         LimpiarErrores();
@@ -330,7 +330,7 @@ public partial class FrmAbmBase : Form
         CambiarModo(ModoAbm.Alta);
     }
 
-    private void IniciarEdicion()
+    protected void IniciarEdicion()
     {
         if (Modo != ModoAbm.Consulta) return;
         var id = IdSeleccionado;
@@ -351,7 +351,7 @@ public partial class FrmAbmBase : Form
         CambiarModo(ModoAbm.Edicion);
     }
 
-    private void GuardarActual()
+    protected void GuardarActual()
     {
         if (Modo == ModoAbm.Consulta) return;
         LimpiarErrores();
@@ -376,7 +376,7 @@ public partial class FrmAbmBase : Form
         }
     }
 
-    private void EliminarSeleccionado()
+    protected void EliminarSeleccionado()
     {
         if (Modo != ModoAbm.Consulta || !PermiteEliminar) return;
         var id = IdSeleccionado;
@@ -400,7 +400,7 @@ public partial class FrmAbmBase : Form
         }
     }
 
-    private void CambiarModo(ModoAbm modo)
+    protected void CambiarModo(ModoAbm modo)
     {
         Modo = modo;
         bool editando = modo != ModoAbm.Consulta;

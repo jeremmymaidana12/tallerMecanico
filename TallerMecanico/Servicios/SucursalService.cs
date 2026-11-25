@@ -36,6 +36,13 @@ public class SucursalService : ServicioBase<Sucursal>
         Exigir(s.IdEmpresa > 0, "Seleccioná la empresa de la sucursal.");
     }
 
+    /// <summary>Todas, con su empresa en la descripcion.</summary>
+    public DataTable ListarTodas() => Db.ConsultarTabla(@"
+        SELECT s.id, s.id_empresa, s.nombre, CONCAT(s.nombre, '  -  ', e.nombre) AS descripcion
+          FROM sucursales s
+          JOIN empresas e ON e.id = s.id_empresa
+      ORDER BY e.id, s.id");
+
     public DataTable ListarCombo(int idEmpresa) => Db.ConsultarTabla(
         "SELECT id, nombre AS descripcion FROM sucursales WHERE id_empresa = @empresa ORDER BY nombre",
         Db.P("@empresa", idEmpresa));

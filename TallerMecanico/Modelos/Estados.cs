@@ -34,6 +34,14 @@ public enum TipoItemFactura
     Servicio
 }
 
+/// <summary>ventas_cabecera.estado</summary>
+public enum EstadoVenta
+{
+    Completado,
+    Pendiente,
+    Anulado
+}
+
 /// <summary>empleados.activo (0 = Inactivo, 1 = Activo)</summary>
 public enum EstadoEmpleado
 {

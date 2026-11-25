@@ -23,8 +23,9 @@ public sealed class FrmPrincipal : Form
     {
         Text = "Taller Mecánico — Sistema de gestión";
         StartPosition = FormStartPosition.CenterScreen;
-        Size = new Size(1400, 820);
-        MinimumSize = new Size(1100, 640);
+        var pantalla = Screen.PrimaryScreen!.WorkingArea.Size;
+        Size = new Size(Math.Min(Lienzo.Px(1423), pantalla.Width), Math.Min(Lienzo.Px(770), pantalla.Height));
+        MinimumSize = new Size(Math.Min(Lienzo.Px(1180), pantalla.Width), Math.Min(Lienzo.Px(640), pantalla.Height));
         BackColor = Tema.Fondo;
         Font = Tema.Fuente;
 
@@ -44,22 +45,22 @@ public sealed class FrmPrincipal : Form
     private void RegistrarModulos()
     {
         AgregarSeccion("TALLER");
-        var vehiculos = AgregarModulo("🚗   Vehículos", () => new FrmVehiculos());
+        var vehiculos = AgregarModulo(Iconos.Auto, "Vehículos", () => new FrmVehiculos());
 
         AgregarSeccion("CATÁLOGOS");
-        AgregarModulo("🏷   Marcas", null);
-        AgregarModulo("📦   Artículos", null);
+        AgregarModulo(Iconos.Etiqueta, "Marcas", null);
+        AgregarModulo(Iconos.Paquete, "Artículos", null);
 
         AgregarSeccion("PERSONAL");
-        AgregarModulo("🪪   Tipos de empleado", null);
-        AgregarModulo("👤   Empleados", null);
+        AgregarModulo(Iconos.Tarjeta, "Tipos de empleado", null);
+        AgregarModulo(Iconos.Persona, "Empleados", null);
 
         AgregarSeccion("EMPRESA");
-        AgregarModulo("🏢   Empresas", null);
-        AgregarModulo("📍   Sucursales", null);
+        AgregarModulo(Iconos.Edificio, "Empresas", null);
+        AgregarModulo(Iconos.Ubicacion, "Sucursales", null);
 
         AgregarSeccion("VENTAS");
-        AgregarModulo("🧾   Ventas", () => new FrmVentas());
+        AgregarModulo(Iconos.Recibo, "Ventas", () => new FrmVentas());
 
         Shown += (_, _) =>
         {
@@ -75,38 +76,40 @@ public sealed class FrmPrincipal : Form
     private void ConstruirLateral()
     {
         pnlLateral.Dock = DockStyle.Left;
-        pnlLateral.Width = 250;
+        pnlLateral.Width = Lienzo.Px(183);
         pnlLateral.BackColor = Tema.Lateral;
 
-        var pnlMarca = new Panel { Dock = DockStyle.Top, Height = 92, Padding = new Padding(22, 22, 12, 0) };
+        var pnlMarca = new Panel { Dock = DockStyle.Top, Height = Lienzo.Px(70) };
         pnlMarca.Controls.Add(new Label
         {
             Text = "Sistema de gestión",
             ForeColor = Tema.LateralTextoSuave,
-            Font = Tema.Fuente,
+            Font = Lienzo.Fuente(13.5f),
             AutoSize = true,
-            Location = new Point(24, 54)
+            Location = new Point(Lienzo.Px(16), Lienzo.Px(38))
         });
         pnlMarca.Controls.Add(new Label
         {
-            Text = "🔧 Taller Mecánico",
+            Text = "Taller Mecánico",
             ForeColor = Color.White,
-            Font = new Font("Segoe UI Semibold", 14F),
+            Font = Lienzo.Fuente(16.5f, true),
             AutoSize = true,
-            Location = new Point(20, 20)
+            Location = new Point(Lienzo.Px(43), Lienzo.Px(15))
         });
+        pnlMarca.Paint += (_, e) => Lienzo.Icono(e.Graphics, Iconos.Llave, 20, Color.White,
+            new Rectangle(Lienzo.Px(18), Lienzo.Px(14), Lienzo.Px(26), Lienzo.Px(26)));
 
         flpMenu.Dock = DockStyle.Fill;
         flpMenu.FlowDirection = FlowDirection.TopDown;
         flpMenu.WrapContents = false;
         flpMenu.AutoScroll = true;
-        flpMenu.Padding = new Padding(12, 0, 12, 0);
+        flpMenu.Padding = new Padding(Lienzo.Px(9), 0, 0, 0);
 
         lblConexion.Dock = DockStyle.Bottom;
-        lblConexion.Height = 44;
-        lblConexion.Padding = new Padding(22, 0, 0, 0);
+        lblConexion.Height = Lienzo.Px(26);
+        lblConexion.Padding = new Padding(Lienzo.Px(14), 0, 0, 0);
         lblConexion.TextAlign = ContentAlignment.MiddleLeft;
-        lblConexion.Font = Tema.FuenteChica;
+        lblConexion.Font = Lienzo.Fuente(10.5f);
         lblConexion.ForeColor = Tema.LateralTextoSuave;
         lblConexion.Cursor = Cursors.Hand;
         lblConexion.Text = "●  Verificando conexión...";
@@ -123,29 +126,29 @@ public sealed class FrmPrincipal : Form
         {
             Text = titulo,
             AutoSize = false,
-            Width = 220,
-            Height = 34,
+            Width = Lienzo.Px(165),
+            Height = Lienzo.Px(24),
             TextAlign = ContentAlignment.BottomLeft,
-            Padding = new Padding(10, 0, 0, 4),
-            Margin = new Padding(0, flpMenu.Controls.Count == 0 ? 4 : 10, 0, 0),
-            Font = new Font("Segoe UI Semibold", 8F),
+            Padding = new Padding(Lienzo.Px(6), 0, 0, Lienzo.Px(2)),
+            Margin = new Padding(0, Lienzo.Px(flpMenu.Controls.Count == 0 ? 4 : 10), 0, 0),
+            Font = Lienzo.Fuente(11.5f),
             ForeColor = Tema.LateralTextoSuave
         });
     }
 
-    private Button AgregarModulo(string texto, Func<Form>? crear)
+    private Button AgregarModulo(string icono, string texto, Func<Form>? crear)
     {
         var boton = new Button
         {
             Text = texto,
-            Width = 222,
-            Height = 40,
-            Margin = new Padding(0, 1, 0, 1),
+            Width = Lienzo.Px(163),
+            Height = Lienzo.Px(30),
+            Margin = new Padding(0, 0, 0, Lienzo.Px(1)),
             TextAlign = ContentAlignment.MiddleLeft,
-            Padding = new Padding(8, 0, 0, 0),
+            Padding = new Padding(Lienzo.Px(34), 0, 0, 0),
             FlatStyle = FlatStyle.Flat,
-            Font = Tema.Fuente,
-            ForeColor = crear is null ? Tema.LateralTextoSuave : Tema.LateralTexto,
+            Font = Lienzo.Fuente(13.5f),
+            ForeColor = Tema.LateralTexto,
             BackColor = Tema.Lateral,
             Cursor = Cursors.Hand,
             UseVisualStyleBackColor = false
@@ -154,12 +157,15 @@ public sealed class FrmPrincipal : Form
         boton.FlatAppearance.MouseOverBackColor = Tema.LateralHover;
         boton.FlatAppearance.MouseDownBackColor = Tema.LateralHover;
 
+        boton.Paint += (_, e) => Lienzo.Icono(e.Graphics, icono, 15, boton.ForeColor,
+            new Rectangle(Lienzo.Px(10), 0, Lienzo.Px(20), boton.Height));
+
         boton.Click += (_, _) =>
         {
             MarcarActivo(boton);
             if (crear is null)
             {
-                MostrarAviso(texto.Trim().Split("   ").Last(),
+                MostrarAviso(texto,
                     "Este módulo todavía está en desarrollo por otro integrante del equipo.");
                 return;
             }
@@ -176,12 +182,12 @@ public sealed class FrmPrincipal : Form
         {
             _botonActivo.BackColor = Tema.Lateral;
             _botonActivo.ForeColor = Tema.LateralTexto;
-            _botonActivo.Font = Tema.Fuente;
+            _botonActivo.Font = Lienzo.Fuente(13.5f);
         }
         _botonActivo = boton;
         boton.BackColor = Tema.Primario;
         boton.ForeColor = Color.White;
-        boton.Font = Tema.FuenteNegrita;
+        boton.Font = Lienzo.Fuente(13.5f, true);
     }
 
     #endregion
