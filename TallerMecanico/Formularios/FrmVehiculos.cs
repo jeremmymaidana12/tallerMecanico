@@ -25,7 +25,13 @@ public partial class FrmVehiculos : FrmAbmBase
         AutoCompleteSource = AutoCompleteSource.ListItems
     };
     private readonly ComboBox cboMarca = new() { DropDownStyle = ComboBoxStyle.DropDownList };
-    private readonly TextBox txtModelo = new() { MaxLength = 100 };
+    private readonly ComboBox cboModelo = new()
+    {
+        DropDownStyle = ComboBoxStyle.DropDown,
+        MaxLength = 100,
+        AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+        AutoCompleteSource = AutoCompleteSource.ListItems
+    };
     private readonly ComboBox cboAnho = new() { DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly ComboBox cboColor = new()
     {
@@ -54,9 +60,13 @@ public partial class FrmVehiculos : FrmAbmBase
         TextoEdicion = "Editar vehículo";
 
         AgregarCampo("Chapa", txtChapa, obligatorio: true, ayuda: "Se guarda en mayúsculas. No puede repetirse.");
-        AgregarCampo("Cliente (dueño)", cboCliente, obligatorio: true, ayuda: "Escribí para buscar por apellido o documento.");
-        AgregarCampo("Marca", cboMarca);
-        AgregarCampo("Modelo", txtModelo);
+        AgregarCampoConAlta("Cliente (dueño)", cboCliente, "Registrar un cliente nuevo", CrearCliente,
+            obligatorio: true, ayuda: "Escribí para buscar por apellido o documento.");
+        AgregarCampoConAlta("Marca", cboMarca, "Crear una marca nueva", CrearMarca);
+        AgregarCampoConAlta("Modelo", cboModelo, "Crear un modelo para la marca elegida", CrearModelo,
+            ayuda: "Elegí de la lista o escribilo.");
+
+        cboMarca.SelectionChangeCommitted += (_, _) => CargarModelos();
         AgregarCampo("Año", cboAnho);
         AgregarCampo("Color", cboColor);
         AgregarCampo("Observación", txtObservacion, alto: 84);
@@ -84,6 +94,20 @@ public partial class FrmVehiculos : FrmAbmBase
         cboMarca.DisplayMember = "descripcion";
         cboMarca.ValueMember = "id";
         cboMarca.DataSource = marcas;
+        CargarModelos();
+    }
+
+    /// <summary>Lista de modelos de la marca elegida (conserva lo que ya estaba escrito).</summary>
+    private void CargarModelos()
+    {
+        var texto = cboModelo.Text;
+        cboModelo.Items.Clear();
+        if (cboMarca.SelectedValue is int marca)
+        {
+            foreach (DataRow f in _datos.ListarModelos(marca).Rows)
+                cboModelo.Items.Add(Convert.ToString(f["descripcion"]) ?? "");
+        }
+        cboModelo.Text = texto;
     }
 
     protected override void LimpiarCampos()
@@ -92,7 +116,8 @@ public partial class FrmVehiculos : FrmAbmBase
         cboCliente.SelectedIndex = -1;
         cboCliente.Text = "";
         if (cboMarca.Items.Count > 0) cboMarca.SelectedIndex = 0;
-        txtModelo.Clear();
+        cboModelo.Text = "";
+        CargarModelos();
         cboAnho.SelectedIndex = 0;
         cboColor.Text = "";
         txtObservacion.Clear();
@@ -107,7 +132,9 @@ public partial class FrmVehiculos : FrmAbmBase
         cboCliente.SelectedValue = v.IdCliente;
         if (v.IdMarca is null) cboMarca.SelectedIndex = 0;
         else cboMarca.SelectedValue = v.IdMarca.Value;
-        txtModelo.Text = v.Modelo ?? "";
+        cboModelo.Text = "";
+        CargarModelos();
+        cboModelo.Text = v.Modelo ?? "";
         SeleccionarAnho(v.Anho);
         cboColor.Text = v.Color ?? "";
         txtObservacion.Text = v.Observacion ?? "";
@@ -141,7 +168,7 @@ public partial class FrmVehiculos : FrmAbmBase
             Chapa = txtChapa.Text.Trim().ToUpperInvariant(),
             IdCliente = ClienteSeleccionado()!.Value,
             IdMarca = cboMarca.SelectedValue is int marca ? marca : null,
-            Modelo = TextoONulo(txtModelo.Text),
+            Modelo = TextoONulo(cboModelo.Text),
             Anho = cboAnho.SelectedItem is int anho ? anho : null,
             Color = TextoONulo(cboColor.Text),
             Observacion = TextoONulo(txtObservacion.Text)
@@ -180,6 +207,53 @@ public partial class FrmVehiculos : FrmAbmBase
         if (grilla.Columns["Año"] is { } anho)
             anho.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
     }
+
+    #region Altas rapidas (botones "+")
+
+    private void CrearCliente()
+    {
+        using var frm = new FrmClientes();
+        if (frm.CrearEnDialogo(TopLevelControl) is { } nuevo)
+            RecargarListas(cliente: nuevo);
+    }
+
+    private void CrearMarca()
+    {
+        using var frm = FrmAbmDescripcion.Marcas();
+        if (frm.CrearEnDialogo(TopLevelControl) is { } nuevo)
+            RecargarListas(marca: nuevo, modelo: "");
+    }
+
+    private void CrearModelo()
+    {
+        using var frm = new FrmModelos { MarcaInicial = cboMarca.SelectedValue as int? };
+        if (frm.CrearEnDialogo(TopLevelControl) is not { } nuevo) return;
+
+        var t = Db.ConsultarTabla("SELECT id_marca, descripcion FROM modelos WHERE id = @id", Db.P("@id", nuevo));
+        if (t.Rows.Count == 0) return;
+        // Se recarga todo por si desde la ventana del modelo tambien se creo una marca.
+        RecargarListas(marca: t.Rows[0]["id_marca"], modelo: Convert.ToString(t.Rows[0]["descripcion"]));
+    }
+
+    /// <summary>Vuelve a leer los combos sin perder lo que el usuario ya habia elegido.</summary>
+    private void RecargarListas(object? cliente = null, object? marca = null, string? modelo = null)
+    {
+        cliente ??= ClienteSeleccionado();
+        marca ??= cboMarca.SelectedValue;
+        modelo ??= cboModelo.Text;
+
+        CargarListas();
+
+        if (cliente is null) { cboCliente.SelectedIndex = -1; cboCliente.Text = ""; }
+        else cboCliente.SelectedValue = Convert.ToInt32(cliente);
+        if (marca is null or DBNull) cboMarca.SelectedIndex = 0;
+        else cboMarca.SelectedValue = Convert.ToInt32(marca);
+        cboModelo.Text = "";
+        CargarModelos();
+        cboModelo.Text = modelo;
+    }
+
+    #endregion
 
     #region Auxiliares
 

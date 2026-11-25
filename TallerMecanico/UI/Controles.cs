@@ -11,6 +11,8 @@ public static class Iconos
         Cerrar = "", Tilde = "", Ver = "", Imprimir = "", Borrar = "",
         Llave = "", Auto = "", Etiqueta = "", Paquete = "", Tarjeta = "",
         Persona = "", Edificio = "", Ubicacion = "", Recibo = "", Menos = "";
+    /// <summary>Hamburguesa, clientes, lista (categorias) y capas (modelos).</summary>
+    public const string Menu = "", Clientes = "", Lista = "", Capas = "", Salir = "";
     /// <summary>No existe en la fuente: lo dibuja Lienzo.Icono.</summary>
     public const string Filtro = "filtro", Puntos = "puntos";
 }

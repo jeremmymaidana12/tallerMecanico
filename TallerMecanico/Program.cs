@@ -1,3 +1,6 @@
+using TallerMecanico.Servicios;
+using TallerMecanico.UI;
+
 namespace TallerMecanico
 {
     internal static class Program
@@ -17,7 +20,21 @@ namespace TallerMecanico
                 MessageBox.Show(Datos.Db.TraducirError(e.Exception), "Error inesperado",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
 
-            Application.Run(new FrmPrincipal());
+            // Login -> sistema. Al "Cerrar sesion" se vuelve al login; al cerrar la ventana, se sale.
+            string? ultimoCorreo = null;
+            while (true)
+            {
+                using (var login = new FrmLogin(ultimoCorreo))
+                {
+                    if (login.ShowDialog() != DialogResult.OK) return;
+                }
+                ultimoCorreo = Sesion.Actual?.Correo;
+
+                using var principal = new FrmPrincipal();
+                Application.Run(principal);
+                Sesion.Cerrar();
+                if (!principal.CerroSesion) return;
+            }
         }
     }
 }

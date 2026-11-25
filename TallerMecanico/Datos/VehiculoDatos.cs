@@ -90,6 +90,10 @@ public sealed class VehiculoDatos
     public DataTable ListarMarcas() => Db.ConsultarTabla(
         "SELECT id, descripcion FROM marcas ORDER BY descripcion");
 
+    public DataTable ListarModelos(int idMarca) => Db.ConsultarTabla(
+        "SELECT id, descripcion FROM modelos WHERE id_marca = @marca ORDER BY descripcion",
+        Db.P("@marca", idMarca));
+
     public static string NormalizarChapa(string chapa) =>
         chapa.Replace(" ", "").Trim().ToUpperInvariant();
 

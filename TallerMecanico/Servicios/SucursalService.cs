@@ -1,4 +1,5 @@
 using System.Data;
+using MySqlConnector;
 using TallerMecanico.Datos;
 using TallerMecanico.Modelos;
 
@@ -34,6 +35,17 @@ public class SucursalService : ServicioBase<Sucursal>
     {
         Exigir(!string.IsNullOrWhiteSpace(s.Nombre), "Ingresá el nombre de la sucursal.");
         Exigir(s.IdEmpresa > 0, "Seleccioná la empresa de la sucursal.");
+    }
+
+    /// <summary>Una empresa siempre tiene que quedar con al menos una sucursal.</summary>
+    public override void Eliminar(long id, MySqlTransaction tx)
+    {
+        var restantes = Db.Escalar(tx, @"
+            SELECT COUNT(*) FROM sucursales
+             WHERE id_empresa = (SELECT id_empresa FROM sucursales WHERE id = @id)", Db.P("@id", id));
+        Exigir(Convert.ToInt64(restantes) != 1,
+            "Es la única sucursal de la empresa. Para quitarla, eliminá la empresa.");
+        base.Eliminar(id, tx);
     }
 
     /// <summary>Todas, con su empresa en la descripcion.</summary>

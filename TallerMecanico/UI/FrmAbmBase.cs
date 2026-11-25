@@ -163,10 +163,38 @@ public partial class FrmAbmBase : Form
         return control;
     }
 
+    /// <summary>
+    /// Igual que AgregarCampo, pero con un boton "+" a la derecha del control.
+    /// Sirve para crear el dato relacionado sin salir de la pantalla
+    /// (por ejemplo, un cliente nuevo desde Vehiculos).
+    /// </summary>
+    protected T AgregarCampoConAlta<T>(string etiqueta, T control, string ayudaBoton, Action alPulsar,
+                                       bool obligatorio = false, string? ayuda = null) where T : Control
+    {
+        Tema.Entrada(control);
+        var contenedor = new Panel { Height = control.Height, Tag = MarcaContenedor };
+        var boton = new Button { Text = "+", Dock = DockStyle.Right, Width = 32, TabStop = false };
+        Tema.Boton(boton, Tema.EstiloBoton.Primario);
+        boton.Font = new Font("Segoe UI Semibold", 12F);
+        boton.Padding = Padding.Empty;
+        boton.Click += (_, _) => alPulsar();
+        tipAyuda.SetToolTip(boton, ayudaBoton);
+
+        control.Dock = DockStyle.Fill;
+        contenedor.Controls.Add(control);
+        contenedor.Controls.Add(new Panel { Dock = DockStyle.Right, Width = 6 });
+        contenedor.Controls.Add(boton);
+        AgregarCampo(etiqueta, contenedor, obligatorio, ayuda: ayuda);
+        return control;
+    }
+
+    private const string MarcaContenedor = "campo-con-alta";
+
     /// <summary>Marca un campo con error, le pasa el foco y devuelve false.</summary>
     protected bool MarcarError(Control control, string mensaje)
     {
-        errorProvider.SetError(control, mensaje);
+        var destino = control.Parent?.Tag as string == MarcaContenedor ? control.Parent : control;
+        errorProvider.SetError(destino, mensaje);
         lblMensajeEdicion.Text = "⚠  " + mensaje;
         lblMensajeEdicion.Visible = true;
         control.Focus();
@@ -214,6 +242,43 @@ public partial class FrmAbmBase : Form
 
     #endregion
 
+    #region Alta rapida (ventana chica)
+
+    private bool _modoDialogo;
+    private object? _idCreado;
+
+    /// <summary>
+    /// Abre este mismo ABM como ventana modal, directo en "Nuevo", sin la grilla.
+    /// Devuelve el id creado o null si se cancelo. Ej.: new FrmClientes().CrearEnDialogo(this)
+    /// </summary>
+    public object? CrearEnDialogo(IWin32Window? duenho)
+    {
+        _modoDialogo = true;
+        pnlToolbar.Visible = false;
+        pnlSeparadorToolbar.Visible = false;
+        pnlGrid.Visible = false;
+        pnlFooter.Visible = false;
+        pnlSeparadorEdicion.Visible = false;
+        pnlEdicion.Dock = DockStyle.Fill;
+
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = false;
+        MinimizeBox = false;
+        ShowInTaskbar = false;
+        StartPosition = FormStartPosition.CenterParent;
+        MinimumSize = Size.Empty;
+
+        int altoCampos = pnlCampos.GetPreferredSize(new Size(pnlCampos.Width, 0)).Height;
+        int alto = pnlHeader.Height + pnlEdicion.Padding.Vertical + lblEdicionTitulo.Height
+                   + altoCampos + lblMensajeEdicion.Height + pnlAccionesEdicion.Height + 30;
+        int maximo = Screen.FromPoint(Cursor.Position).WorkingArea.Height - 60;
+        ClientSize = new Size(pnlEdicion.Width + 20, Math.Min(alto, maximo));
+
+        return ShowDialog(duenho) == DialogResult.OK ? _idCreado : null;
+    }
+
+    #endregion
+
     #region Ciclo de vida
 
     protected override void OnLoad(EventArgs e)
@@ -226,6 +291,7 @@ public partial class FrmAbmBase : Form
         tipAyuda.SetToolTip(btnEliminar, "Eliminar el seleccionado (Supr)");
         tipAyuda.SetToolTip(btnRefrescar, "Volver a leer los datos (F5)");
         RefrescarGrilla();
+        if (_modoDialogo) IniciarAlta();
     }
 
     private void AplicarTema()
@@ -362,6 +428,12 @@ public partial class FrmAbmBase : Form
             UseWaitCursor = true;
             bool esAlta = Modo == ModoAbm.Alta;
             var id = Guardar(IdActual);
+            if (_modoDialogo)
+            {
+                _idCreado = id;
+                DialogResult = DialogResult.OK;
+                return;
+            }
             CambiarModo(ModoAbm.Consulta);
             RefrescarGrilla(id ?? IdActual);
             Notificar(esAlta ? "Registro creado correctamente." : "Cambios guardados correctamente.");
@@ -402,6 +474,12 @@ public partial class FrmAbmBase : Form
 
     protected void CambiarModo(ModoAbm modo)
     {
+        if (_modoDialogo && modo == ModoAbm.Consulta)
+        {
+            // En la ventana de alta rapida, cancelar = cerrar.
+            DialogResult = DialogResult.Cancel;
+            return;
+        }
         Modo = modo;
         bool editando = modo != ModoAbm.Consulta;
 
