@@ -45,6 +45,22 @@ public class EmpleadoService : ServicioBase<Empleado>
           FROM empleados
       ORDER BY nombre");
 
+    /// <summary>Administradores activos (rol Administrador, activo = 1), sin contar excluirId.</summary>
+    public int ContarAdminsActivos(int? excluirId = null) => Convert.ToInt32(Db.Escalar(@"
+        SELECT COUNT(*)
+          FROM empleados em
+          JOIN tipos_empleados t ON t.id = em.id_tipo_empleado
+         WHERE UPPER(t.descripcion) = UPPER(@rol) AND em.activo = 1
+           AND (@excluir IS NULL OR em.id <> @excluir)",
+        Db.P("@rol", Sesion.RolAdministrador), Db.P("@excluir", excluirId)));
+
+    public bool EsAdminActivo(int id) => Convert.ToInt32(Db.Escalar(@"
+        SELECT COUNT(*)
+          FROM empleados em
+          JOIN tipos_empleados t ON t.id = em.id_tipo_empleado
+         WHERE em.id = @id AND em.activo = 1 AND UPPER(t.descripcion) = UPPER(@rol)",
+        Db.P("@id", id), Db.P("@rol", Sesion.RolAdministrador))) > 0;
+
     /// <summary>Activos de la empresa, mas el empleado indicado aunque este inactivo.</summary>
     public DataTable ListarCombo(int idEmpresa, int? incluirId = null) => Db.ConsultarTabla(@"
         SELECT id, nombre AS descripcion

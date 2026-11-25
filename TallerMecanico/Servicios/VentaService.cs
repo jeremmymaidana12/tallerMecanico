@@ -5,6 +5,15 @@ using TallerMecanico.Modelos;
 
 namespace TallerMecanico.Servicios;
 
+/// <summary>Filtros del historial; null = sin filtrar.</summary>
+public sealed class FiltroVentas
+{
+    public DateTime? Desde { get; set; }
+    public EstadoVenta? Estado { get; set; }
+    public int? IdSucursal { get; set; }
+    public int? IdEmpleado { get; set; }
+}
+
 /// <summary>Ventas: guarda cabecera y detalles juntos en una transaccion.</summary>
 public class VentaService : ServicioBase<VentaCabecera>
 {
@@ -22,7 +31,8 @@ public class VentaService : ServicioBase<VentaCabecera>
         ["total"] = v.Total,
         ["grav"] = v.Grav,
         ["exc"] = v.Exc,
-        ["iva"] = v.Iva
+        ["iva"] = v.Iva,
+        ["estado"] = v.Estado.ATexto()
     };
 
     protected override VentaCabecera Mapear(DataRow f) => new()
@@ -36,6 +46,7 @@ public class VentaService : ServicioBase<VentaCabecera>
         Grav = Convert.ToDecimal(f["grav"]),
         Exc = Convert.ToDecimal(f["exc"]),
         Iva = Convert.ToDecimal(f["iva"]),
+        Estado = Estados.Desde<EstadoVenta>(Texto(f, "estado")),
         CreatedAt = FechaONula(f, "created_at"),
         UpdatedAt = FechaONula(f, "updated_at")
     };
@@ -43,25 +54,37 @@ public class VentaService : ServicioBase<VentaCabecera>
     protected override void Validar(VentaCabecera v) =>
         Exigir(v.Detalles.Count > 0, "Agregá al menos un artículo a la venta.");
 
-    /// <summary>Listado para la grilla. Los alias son los titulos de las columnas.</summary>
-    public override DataTable Listar() => Db.ConsultarTabla(@"
+    public override DataTable Listar() => Listar(new FiltroVentas());
+
+    /// <summary>Historial. Los alias son los titulos; las columnas de dos renglones se separan con un salto.</summary>
+    public DataTable Listar(FiltroVentas filtro) => Db.ConsultarTabla(@"
         SELECT v.id,
-               v.id + 0                                          AS `Nro.`,
-               v.created_at                                      AS `Fecha`,
-               COALESCE(CONCAT(c.apellido, ', ', c.nombre), '')  AS `Cliente`,
-               COALESCE(e.nombre, '')                            AS `Empleado`,
-               COALESCE(em.nombre, '')                           AS `Empresa`,
-               COALESCE(s.nombre, '')                            AS `Sucursal`,
-               v.grav                                            AS `Gravado`,
-               v.exc                                             AS `Exento`,
-               v.iva                                             AS `IVA`,
-               v.total                                           AS `Total`
+               CONCAT('#', v.id, '\n', COALESCE(DATE_FORMAT(v.created_at, '%d/%m/%Y %H:%i'), '')) AS `Comprobante / Fecha`,
+               CONCAT(COALESCE(CONCAT(c.apellido, ', ', c.nombre), '(cliente eliminado)'), '\n',
+                      CASE WHEN COALESCE(c.nro_documento, '') = '' THEN ''
+                           WHEN c.nro_documento REGEXP '^[0-9]+$'
+                           THEN CONCAT('CI ', REPLACE(FORMAT(c.nro_documento, 0, 'en_US'), ',', '.'))
+                           ELSE CONCAT('CI ', c.nro_documento) END)                        AS `Cliente / Documento`,
+               CONCAT(COALESCE(e.nombre, '—'), '\n', COALESCE(s.nombre, '—'))              AS `Vendedor / Sucursal`,
+               CONCAT(v.estado, '')                                                        AS `Estado`,
+               v.total                                                                     AS `Total`,
+               ''                                                                          AS `Acciones`,
+               COALESCE((SELECT GROUP_CONCAT(a.descripcion SEPARATOR ', ')
+                           FROM ventas_detalle d
+                           JOIN articulos a ON a.id = d.id_articulo
+                          WHERE d.id_venta = v.id), '')                                    AS articulos,
+               COALESCE(c.nro_documento, '')                                               AS documento
           FROM ventas_cabecera v
-     LEFT JOIN clientes c   ON c.id  = v.id_cliente
-     LEFT JOIN empleados e  ON e.id  = v.id_empleado
-     LEFT JOIN empresas em  ON em.id = v.id_empresa
-     LEFT JOIN sucursales s ON s.id  = v.id_sucursal
-      ORDER BY v.id DESC");
+     LEFT JOIN clientes c   ON c.id = v.id_cliente
+     LEFT JOIN empleados e  ON e.id = v.id_empleado
+     LEFT JOIN sucursales s ON s.id = v.id_sucursal
+         WHERE (@desde IS NULL OR v.created_at >= @desde)
+           AND (@estado IS NULL OR v.estado = @estado)
+           AND (@sucursal IS NULL OR v.id_sucursal = @sucursal)
+           AND (@empleado IS NULL OR v.id_empleado = @empleado)
+      ORDER BY v.id DESC",
+        Db.P("@desde", filtro.Desde), Db.P("@estado", filtro.Estado?.ATexto()),
+        Db.P("@sucursal", filtro.IdSucursal), Db.P("@empleado", filtro.IdEmpleado));
 
     public override VentaCabecera? Obtener(long id)
     {
@@ -72,6 +95,7 @@ public class VentaService : ServicioBase<VentaCabecera>
 
     public override long Crear(VentaCabecera v, MySqlTransaction tx)
     {
+        Exigir(v.Estado != EstadoVenta.Anulado, "No se puede crear una venta anulada.");
         v.CalcularTotales();
         ValidarRelaciones(v, tx);
         var id = base.Crear(v, tx);
@@ -82,6 +106,8 @@ public class VentaService : ServicioBase<VentaCabecera>
 
     public override void Editar(VentaCabecera v, MySqlTransaction tx)
     {
+        Exigir(v.Estado != EstadoVenta.Anulado, "Para anular una venta usá CambiarEstado.");
+        Exigir(BloquearYLeerEstado(v.Id, tx) != EstadoVenta.Anulado, "Una venta anulada no se puede editar.");
         v.CalcularTotales();
         ValidarRelaciones(v, tx);
         var anteriores = CantidadesGuardadas(v.Id, tx);
@@ -103,15 +129,31 @@ public class VentaService : ServicioBase<VentaCabecera>
         DescontarStock(anteriores, [], tx);
     }
 
+    /// <summary>Cambia el estado. Anular devuelve el stock y es definitivo.</summary>
+    public void CambiarEstado(long id, EstadoVenta estado) => Db.EnTransaccion(tx =>
+    {
+        Exigir(BloquearYLeerEstado(id, tx) != EstadoVenta.Anulado, "La venta ya está anulada.");
+        if (estado == EstadoVenta.Anulado) DescontarStock(CantidadesGuardadas(id, tx), [], tx);
+        return Db.Ejecutar(tx, "UPDATE ventas_cabecera SET estado = @estado, updated_at = NOW() WHERE id = @id",
+            Db.P("@estado", estado.ATexto()), Db.P("@id", id));
+    });
+
+    /// <summary>Bloquea la venta para que nadie mas la modifique a la vez. Null si no existe.</summary>
+    private static EstadoVenta? BloquearYLeerEstado(long id, MySqlTransaction tx)
+    {
+        var texto = Db.Escalar(tx, "SELECT estado FROM ventas_cabecera WHERE id = @id FOR UPDATE", Db.P("@id", id));
+        return texto is null ? null : Estados.Desde<EstadoVenta>(Convert.ToString(texto));
+    }
+
     #region Stock
 
     private static Dictionary<int, decimal> CantidadesPorArticulo(IEnumerable<VentaDetalle> detalles) =>
         detalles.GroupBy(d => d.IdArticulo).ToDictionary(g => g.Key, g => g.Sum(d => d.Cantidad));
 
-    /// <summary>Cantidades ya guardadas. Bloquea la venta para que nadie mas la modifique a la vez.</summary>
+    /// <summary>Cantidades que la venta tiene descontadas del stock (una anulada, ninguna).</summary>
     private static Dictionary<int, decimal> CantidadesGuardadas(long idVenta, MySqlTransaction tx)
     {
-        Db.Escalar(tx, "SELECT id FROM ventas_cabecera WHERE id = @id FOR UPDATE", Db.P("@id", idVenta));
+        if (BloquearYLeerEstado(idVenta, tx) is null or EstadoVenta.Anulado) return [];
         var tabla = Db.ConsultarTabla(tx, @"
             SELECT id_articulo, SUM(cantidad) AS cantidad
               FROM ventas_detalle

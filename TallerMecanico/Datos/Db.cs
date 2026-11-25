@@ -119,11 +119,47 @@ public static class Db
         return valor == DBNull.Value ? null : valor;
     }
 
+    /// <summary>
+    /// Crea las tablas nuevas que todavia no esten en la base (se puede correr siempre).
+    /// Asi nadie del grupo tiene que acordarse de importar los scripts nuevos.
+    /// </summary>
+    public static void AsegurarEsquema()
+    {
+        Ejecutar(@"
+            CREATE TABLE IF NOT EXISTS modelos (
+                id          INT(11)      NOT NULL AUTO_INCREMENT,
+                id_marca    INT(11)      NOT NULL,
+                descripcion VARCHAR(100) NOT NULL,
+                PRIMARY KEY (id),
+                UNIQUE KEY uq_modelo_marca (id_marca, descripcion),
+                CONSTRAINT fk_modelos_marca FOREIGN KEY (id_marca) REFERENCES marcas (id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // Los modelos ya escritos en vehiculos pasan a la lista (no duplica).
+        Ejecutar(@"
+            INSERT IGNORE INTO modelos (id_marca, descripcion)
+            SELECT DISTINCT id_marca, TRIM(modelo)
+              FROM vehiculos
+             WHERE id_marca IS NOT NULL AND COALESCE(TRIM(modelo), '') <> ''");
+
+        // Control de usuarios: fecha del ultimo ingreso y correo unico (es el usuario del login).
+        Ejecutar("ALTER TABLE empleados ADD COLUMN IF NOT EXISTS ultimo_acceso DATETIME NULL DEFAULT NULL");
+        try
+        {
+            Ejecutar("CREATE UNIQUE INDEX IF NOT EXISTS uq_empleados_correo ON empleados (correo)");
+        }
+        catch (MySqlException)
+        {
+            // Si ya hay correos repetidos no se puede crear: el ABM de usuarios igual lo valida.
+        }
+    }
+
     public static bool ProbarConexion(out string error)
     {
         try
         {
             using var conexion = AbrirConexion();
+            AsegurarEsquema();
             error = "";
             return true;
         }

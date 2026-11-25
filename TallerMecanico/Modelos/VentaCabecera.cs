@@ -11,6 +11,7 @@ public sealed class VentaCabecera : EntidadBase
     public decimal Grav { get; set; }
     public decimal Exc { get; set; }
     public decimal Iva { get; set; }
+    public EstadoVenta Estado { get; set; }
     public DateTime? CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 

@@ -27,7 +27,7 @@ public static class Tema
     public static readonly Color Deshabilitado = Color.FromArgb(203, 213, 225);
 
     // Menu lateral
-    public static readonly Color Lateral = Color.FromArgb(15, 23, 42);
+    public static readonly Color Lateral = Color.FromArgb(5, 11, 27);
     public static readonly Color LateralHover = Color.FromArgb(30, 41, 59);
     public static readonly Color LateralTexto = Color.FromArgb(203, 213, 225);
     public static readonly Color LateralTextoSuave = Color.FromArgb(100, 116, 139);

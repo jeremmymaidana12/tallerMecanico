@@ -7,7 +7,7 @@ namespace TallerMecanico.Servicios;
 public class ClienteService : ServicioBase<Cliente>
 {
     protected override string Tabla => "clientes";
-    protected override IReadOnlyList<(string Tabla, string Columna)> Referencias => [("ventas_cabecera", "id_cliente")];
+    protected override IReadOnlyList<(string Tabla, string Columna)> Referencias => [("ventas_cabecera", "id_cliente"), ("vehiculos", "id_cliente")];
 
     protected override IReadOnlyDictionary<string, object?> Columnas(Cliente c) => new Dictionary<string, object?>
     {
